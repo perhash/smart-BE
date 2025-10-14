@@ -13,20 +13,42 @@ const PORT = process.env.PORT || 5000;
 // Initialize Prisma Client
 const prisma = new PrismaClient();
 
-// Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:8080',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:8080',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean),
+// CORS Configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8080',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
+      process.env.FRONTEND_URL,
+      process.env.VERCEL_FRONTEND_URL,
+    ].filter(Boolean);
+    
+    // Check if origin is allowed
+    if (allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin.includes('*')) {
+        return origin.includes(allowedOrigin.replace('*', ''));
+      }
+      return origin === allowedOrigin;
+    })) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+};
+
+// Middleware
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -66,7 +88,27 @@ app.get('/api/test', (req, res) => {
     success: true,
     message: 'Backend is connected!',
     timestamp: new Date().toISOString(),
-    frontend: 'You can reach me!'
+    frontend: 'You can reach me!',
+    origin: req.headers.origin || 'No origin header'
+  });
+});
+
+// CORS test endpoint
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'CORS test successful',
+    origin: req.headers.origin,
+    method: req.method,
+    allowedOrigins: [
+      'http://localhost:8080',
+      process.env.FRONTEND_URL,
+      process.env.VERCEL_FRONTEND_URL,
+    ].filter(Boolean),
+    environment: {
+      FRONTEND_URL: process.env.FRONTEND_URL,
+      VERCEL_FRONTEND_URL: process.env.VERCEL_FRONTEND_URL,
+    }
   });
 });
 
