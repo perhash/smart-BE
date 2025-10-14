@@ -1,0 +1,170 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User model for authentication and role management
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?  @unique
+  password  String
+  role      UserRole @default(ADMIN)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  adminProfile AdminProfile?
+  riderProfile RiderProfile?
+
+  @@map("users")
+}
+
+// Admin/Supplier profile
+model AdminProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  company   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admin_profiles")
+}
+
+// Rider profile
+model RiderProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  name      String
+  phone     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders   Order[]
+
+  @@map("rider_profiles")
+}
+
+// Customer model
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String   @unique
+  whatsapp    String?  // WhatsApp number (optional)
+  houseNo     String?  // House number
+  streetNo    String?  // Street number
+  area        String?  // Area/neighborhood
+  city        String?
+  bottleCount Int      @default(0) // Number of bottles customer has
+  avgDaysToRefill Int? // Average days between refills (optional)
+  isActive    Boolean  @default(true)
+  currentBalance Decimal @default(0) // Current balance (can be negative or positive)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  orders   Order[]
+
+  @@map("customers")
+}
+
+// Order model
+model Order {
+  id          String      @id @default(cuid())
+  customerId  String
+  riderId     String?
+  status      OrderStatus @default(PENDING)
+  priority    Priority    @default(NORMAL)
+  notes       String?
+  totalAmount Decimal
+  // Payment fields
+  paidAmount      Decimal       @default(0)
+  paymentStatus   PaymentStatus @default(NOT_PAID)
+  paymentMethod   PaymentMethod @default(CASH)
+  paymentNotes    String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deliveredAt DateTime?
+
+  // Relations
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rider    RiderProfile? @relation(fields: [riderId], references: [id], onDelete: SetNull)
+
+  @@map("orders")
+}
+
+
+// Notification model for push notifications
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String?          // If null, it's a system-wide notification
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  data      Json?            // Additional data for the notification
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  RIDER
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  DELIVERED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PaymentStatus {
+  PAID
+  NOT_PAID
+  OVERPAID
+  PARTIAL
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_WALLET
+}
+
+enum NotificationType {
+  ORDER_ASSIGNED
+  ORDER_DELIVERED
+  PAYMENT_RECEIVED
+  PAYMENT_OVERDUE
+  SYSTEM_UPDATE
+}
+
