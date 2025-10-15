@@ -85,20 +85,61 @@ export const getOrderById = async (req, res) => {
 // Create new order
 export const createOrder = async (req, res) => {
   try {
-    const { customerId, totalAmount, notes, priority = 'NORMAL' } = req.body;
+    const { customerId, riderId, totalAmount, notes, priority = 'NORMAL' } = req.body;
+
+    // Validate required fields
+    if (!customerId || !totalAmount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer ID and total amount are required'
+      });
+    }
+
+    // If riderId is provided, set status to ASSIGNED, otherwise PENDING
+    const status = riderId ? 'ASSIGNED' : 'PENDING';
 
     const order = await prisma.order.create({
       data: {
         customerId,
+        riderId: riderId || null,
         totalAmount: parseFloat(totalAmount),
         notes,
         priority: priority.toUpperCase(),
-        status: 'PENDING'
+        status: status
       },
       include: {
-        customer: true
+        customer: {
+          select: { name: true, phone: true }
+        },
+        rider: {
+          select: { name: true }
+        }
       }
     });
+
+    // Emit real-time event for new order
+    if (global.io) {
+      console.log('📤 Emitting new-order event to admin room');
+      console.log('📊 Available rooms:', Array.from(global.io.sockets.adapter.rooms.keys()));
+      global.io.to('admin').emit('new-order', order);
+      
+      if (riderId) {
+        // Get the user ID from the rider profile
+        const riderProfile = await prisma.riderProfile.findUnique({
+          where: { id: riderId },
+          select: { userId: true }
+        });
+        
+        if (riderProfile) {
+          console.log(`📤 Emitting new-order event to rider-${riderProfile.userId} room`);
+          global.io.to(`rider-${riderProfile.userId}`).emit('new-order', order);
+        } else {
+          console.log(`❌ Rider profile not found for ID: ${riderId}`);
+        }
+      }
+    } else {
+      console.log('❌ global.io is not available');
+    }
 
     res.status(201).json({
       success: true,

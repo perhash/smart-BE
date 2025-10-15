@@ -30,6 +30,7 @@ export const getAllRiders = async (req, res) => {
 
     const formattedRiders = riders.map(rider => ({
       id: rider.id,
+      userId: rider.userId, // Add userId for notifications
       name: rider.name,
       phone: rider.phone,
       email: rider.user.email,
