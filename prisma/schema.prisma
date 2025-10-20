@@ -93,6 +93,7 @@ model Order {
   priority    Priority    @default(NORMAL)
   notes       String?
   totalAmount Decimal
+  numberOfBottles Int     @default(1) // Number of bottles in this order
   // Payment fields
   paidAmount      Decimal       @default(0)
   paymentStatus   PaymentStatus @default(NOT_PAID)
@@ -157,7 +158,10 @@ enum PaymentMethod {
   CASH
   CARD
   BANK_TRANSFER
-  MOBILE_WALLET
+  JAZZCASH
+  EASYPAISA
+  NAYA_PAY
+  SADAPAY
 }
 
 enum NotificationType {

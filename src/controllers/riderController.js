@@ -106,53 +106,43 @@ export const getRiderDashboard = async (req, res) => {
   try {
     const { riderId } = req.params;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // Get today's deliveries
-    const todaysDeliveries = await prisma.order.findMany({
+    // Fetch all orders for this rider (no date filter to ensure immediacy)
+    const riderOrders = await prisma.order.findMany({
       where: {
-        riderId,
-        createdAt: {
-          gte: today,
-          lt: tomorrow
-        }
+        riderId
       },
       include: {
         customer: {
-          select: { name: true, phone: true }
+          select: { name: true, phone: true, houseNo: true, streetNo: true, area: true }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // Get completed deliveries
-    const completedDeliveries = todaysDeliveries.filter(order => order.status === 'DELIVERED');
-    
-    // Get assigned deliveries
-    const assignedDeliveries = todaysDeliveries.filter(order => 
-      order.status === 'ASSIGNED' || order.status === 'IN_PROGRESS'
-    );
+    const completedDeliveries = riderOrders.filter(order => order.status === 'DELIVERED');
+    const assignedDeliveries = riderOrders.filter(order => order.status === 'ASSIGNED' || order.status === 'IN_PROGRESS');
 
     const formattedAssigned = assignedDeliveries.map(delivery => ({
       id: `#${delivery.id.slice(-4)}`,
+      originalId: delivery.id,
       customer: delivery.customer.name,
       phone: delivery.customer.phone,
       address: `${delivery.customer.houseNo || ''} ${delivery.customer.streetNo || ''} ${delivery.customer.area || ''}`.trim(),
-      bottles: Math.floor(Math.random() * 10) + 1, // Mock data
+      bottles: delivery.numberOfBottles,
       amount: parseFloat(delivery.totalAmount),
+      priority: delivery.priority.toLowerCase(),
       paymentStatus: delivery.paymentStatus === 'PAID' ? 'paid' : 'unpaid'
     }));
 
     const formattedCompleted = completedDeliveries.map(delivery => ({
       id: `#${delivery.id.slice(-4)}`,
+      originalId: delivery.id,
       customer: delivery.customer.name,
       phone: delivery.customer.phone,
       address: `${delivery.customer.houseNo || ''} ${delivery.customer.streetNo || ''} ${delivery.customer.area || ''}`.trim(),
-      bottles: Math.floor(Math.random() * 10) + 1, // Mock data
+      bottles: delivery.numberOfBottles,
       amount: parseFloat(delivery.totalAmount),
+      priority: delivery.priority.toLowerCase(),
       paymentStatus: delivery.paymentStatus === 'PAID' ? 'paid' : 'unpaid'
     }));
 
@@ -162,7 +152,7 @@ export const getRiderDashboard = async (req, res) => {
         assignedDeliveries: formattedAssigned,
         completedDeliveries: formattedCompleted,
         stats: {
-          totalToday: todaysDeliveries.length,
+          totalToday: riderOrders.length,
           completed: completedDeliveries.length,
           pending: assignedDeliveries.length
         }

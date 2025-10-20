@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 // Get all customers
 export const getAllCustomers = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, q } = req.query;
     
     // Build where clause based on status filter
     let whereClause = {};
@@ -14,6 +14,22 @@ export const getAllCustomers = async (req, res) => {
       whereClause = { isActive: true };
     } else if (status === 'inactive') {
       whereClause = { isActive: false };
+    }
+    if (q) {
+      const term = q.toString();
+      whereClause = {
+        AND: [
+          whereClause,
+          {
+            OR: [
+              { name: { contains: term, mode: 'insensitive' } },
+              { phone: { contains: term } },
+              { whatsapp: { contains: term } },
+              { houseNo: { contains: term, mode: 'insensitive' } }
+            ]
+          }
+        ]
+      };
     }
     // If no status filter, return all customers
     
