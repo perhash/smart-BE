@@ -20,31 +20,57 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:8080',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:8080',
+      // Local development (only in development mode)
+      ...(process.env.NODE_ENV === 'development' ? [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8080'
+      ] : []),
+      // Environment-based URLs
       process.env.FRONTEND_URL,
       process.env.VERCEL_FRONTEND_URL,
-    ].filter(Boolean);
+      process.env.VERCEL_URL,
+      process.env.ALLOWED_ORIGINS?.split(',').map(url => url.trim()),
+      // Common Vercel patterns
+      /^https:\/\/.*\.vercel\.app$/,
+      /^https:\/\/.*\.vercel\.dev$/,
+    ].filter(Boolean).flat();
     
     // Check if origin is allowed
-    if (allowedOrigins.some(allowedOrigin => {
-      if (allowedOrigin.includes('*')) {
-        return origin.includes(allowedOrigin.replace('*', ''));
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        if (allowedOrigin.includes('*')) {
+          return origin.includes(allowedOrigin.replace('*', ''));
+        }
+        return origin === allowedOrigin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
       }
-      return origin === allowedOrigin;
-    })) {
+      return false;
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);
+      console.log('Allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 
 // Middleware
@@ -101,10 +127,11 @@ app.get('/api/cors-test', (req, res) => {
     origin: req.headers.origin,
     method: req.method,
     allowedOrigins: [
-      'http://localhost:8080',
       process.env.FRONTEND_URL,
       process.env.VERCEL_FRONTEND_URL,
-    ].filter(Boolean),
+      process.env.VERCEL_URL,
+      process.env.ALLOWED_ORIGINS?.split(',').map(url => url.trim()),
+    ].filter(Boolean).flat(),
     environment: {
       FRONTEND_URL: process.env.FRONTEND_URL,
       VERCEL_FRONTEND_URL: process.env.VERCEL_FRONTEND_URL,
@@ -233,7 +260,7 @@ process.on('SIGINT', async () => {
 app.listen(PORT, () => {
   console.log(`🚀 SmartSupply Backend Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'Not configured'}`);
 });
 
 export default app;
