@@ -120,21 +120,51 @@ export const getOrderById = async (req, res) => {
 // Create new order
 export const createOrder = async (req, res) => {
   try {
-    const { customerId, totalAmount, notes, priority = 'NORMAL', numberOfBottles = 1, riderId } = req.body;
+    const { customerId, notes, priority = 'NORMAL', numberOfBottles = 1, riderId, unitPrice } = req.body;
 
-    const order = await prisma.order.create({
-      data: {
-        customerId,
-        totalAmount: parseFloat(totalAmount),
-        notes,
-        priority: priority.toUpperCase(),
-        riderId: riderId || null,
-        numberOfBottles: parseInt(numberOfBottles),
-        status: riderId ? 'ASSIGNED' : 'PENDING'
-      },
-      include: {
-        customer: true
-      }
+    // Fetch customer's current balance
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { currentBalance: true }
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found'
+      });
+    }
+
+    const customerBalance = parseFloat(customer.currentBalance);
+    const currentOrderAmount = parseFloat(numberOfBottles) * parseFloat(unitPrice);
+    const totalAmount = customerBalance + currentOrderAmount;
+
+    const order = await prisma.$transaction(async (tx) => {
+      // Create the order with new balance tracking fields
+      const newOrder = await tx.order.create({
+        data: {
+          customerId,
+          totalAmount,
+          currentOrderAmount,
+          customerBalance,
+          notes,
+          priority: priority.toUpperCase(),
+          riderId: riderId || null,
+          numberOfBottles: parseInt(numberOfBottles),
+          status: riderId ? 'ASSIGNED' : 'PENDING'
+        },
+        include: {
+          customer: true
+        }
+      });
+
+      // Update customer's current balance to the new total
+      await tx.customer.update({
+        where: { id: customerId },
+        data: { currentBalance: totalAmount }
+      });
+
+      return newOrder;
     });
 
     // If assigned to a rider, create a notification for the rider's user
@@ -238,15 +268,27 @@ export const deliverOrder = async (req, res) => {
 
     const total = parseFloat(order.totalAmount);
     const paid = Math.max(0, parseFloat(paymentAmount));
+    const remaining = total - paid;
 
+    // Determine payment status
     let paymentStatus = 'NOT_PAID';
     if (paid === 0) paymentStatus = 'NOT_PAID';
     else if (paid > 0 && paid < total) paymentStatus = 'PARTIAL';
     else if (paid === total) paymentStatus = 'PAID';
     else if (paid > total) paymentStatus = 'OVERPAID';
 
-    const balanceDelta = total - paid; // positive => receivable, negative => payable
-    const newCustomerBalance = parseFloat(order.customer.currentBalance) + balanceDelta;
+    // Calculate receivable and payable
+    let receivable = 0;
+    let payable = 0;
+    if (remaining > 0) {
+      receivable = remaining; // Customer owes us money
+    } else if (remaining < 0) {
+      payable = Math.abs(remaining); // We owe customer money
+    }
+    // If remaining = 0, both stay 0 (default values)
+
+    // Calculate new customer balance: current balance - current order amount + paid amount
+    const newCustomerBalance = parseFloat(order.customer.currentBalance) - parseFloat(order.currentOrderAmount) + paid;
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
@@ -257,6 +299,8 @@ export const deliverOrder = async (req, res) => {
           paymentStatus,
           paymentMethod,
           paymentNotes: notes || null,
+          receivable,
+          payable,
           deliveredAt: new Date()
         },
         include: {
@@ -277,6 +321,59 @@ export const deliverOrder = async (req, res) => {
   } catch (error) {
     console.error('Error delivering order:', error);
     return res.status(500).json({ success: false, message: 'Failed to deliver order', error: error.message });
+  }
+};
+
+// Cancel order and revert customer balance
+export const cancelOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { customer: true }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.status === 'CANCELLED') {
+      return res.status(400).json({ success: false, message: 'Order is already cancelled' });
+    }
+
+    if (order.status === 'DELIVERED') {
+      return res.status(400).json({ success: false, message: 'Cannot cancel a delivered order' });
+    }
+
+    // Revert customer balance to the balance before this order
+    const originalCustomerBalance = parseFloat(order.customerBalance);
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedOrder = await tx.order.update({
+        where: { id },
+        data: {
+          status: 'CANCELLED'
+        },
+        include: {
+          customer: true,
+          rider: true
+        }
+      });
+
+      // Revert customer balance to original balance before this order
+      await tx.customer.update({
+        where: { id: order.customerId },
+        data: { currentBalance: originalCustomerBalance }
+      });
+
+      return updatedOrder;
+    });
+
+    return res.json({ success: true, data: updated, message: 'Order cancelled and customer balance reverted' });
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    return res.status(500).json({ success: false, message: 'Failed to cancel order', error: error.message });
   }
 };
 

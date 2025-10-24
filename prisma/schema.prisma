@@ -99,6 +99,11 @@ model Order {
   paymentStatus   PaymentStatus @default(NOT_PAID)
   paymentMethod   PaymentMethod @default(CASH)
   paymentNotes    String?
+  // Balance tracking fields
+  customerBalance Decimal       @default(0) // Customer balance at time of order creation
+  currentOrderAmount Decimal    @default(0) // Bottles × unit price
+  payable    Decimal           @default(0) // Amount we owe customer (if overpaid)
+  receivable Decimal           @default(0) // Amount customer owes us (if underpaid)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   deliveredAt DateTime?
