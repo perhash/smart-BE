@@ -267,7 +267,7 @@ export const deliverOrder = async (req, res) => {
     }
 
     const total = parseFloat(order.totalAmount);
-    const paid = Math.max(0, parseFloat(paymentAmount));
+    const paid = parseFloat(paymentAmount);
     const remaining = total - paid;
 
     // Determine payment status
