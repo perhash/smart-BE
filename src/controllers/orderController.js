@@ -137,11 +137,21 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Fetch customer's current balance
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
-      select: { currentBalance: true }
-    });
+    // Handle walk-in customer lookup
+    let customer;
+    if (customerId === 'walkin') {
+      // Find the walk-in customer by name
+      customer = await prisma.customer.findFirst({
+        where: { name: 'Walk-in Customer' },
+        select: { id: true, currentBalance: true }
+      });
+    } else {
+      // Regular customer lookup
+      customer = await prisma.customer.findUnique({
+        where: { id: customerId },
+        select: { id: true, currentBalance: true }
+      });
+    }
 
     if (!customer) {
       return res.status(404).json({
@@ -166,7 +176,7 @@ export const createOrder = async (req, res) => {
       // Create the order with new balance tracking fields
       const newOrder = await tx.order.create({
         data: {
-          customerId,
+          customerId: customer.id, // Use the actual customer ID
           totalAmount,
           currentOrderAmount,
           customerBalance,
@@ -184,7 +194,7 @@ export const createOrder = async (req, res) => {
 
       // Update customer's current balance to the new total
       await tx.customer.update({
-        where: { id: customerId },
+        where: { id: customer.id }, // Use the actual customer ID
         data: { currentBalance: totalAmount }
       });
 
