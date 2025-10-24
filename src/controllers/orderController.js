@@ -287,8 +287,8 @@ export const deliverOrder = async (req, res) => {
     }
     // If remaining = 0, both stay 0 (default values)
 
-    // Calculate new customer balance: current balance - current order amount + paid amount
-    const newCustomerBalance = parseFloat(order.customer.currentBalance) - parseFloat(order.currentOrderAmount) + paid;
+    // Calculate new customer balance: current balance - paid amount
+    const newCustomerBalance = parseFloat(order.customer.currentBalance) - paid;
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
