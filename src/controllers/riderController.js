@@ -131,7 +131,7 @@ export const getRiderDashboard = async (req, res) => {
       bottles: delivery.numberOfBottles,
       amount: parseFloat(delivery.totalAmount),
       priority: delivery.priority.toLowerCase(),
-      paymentStatus: delivery.paymentStatus === 'PAID' ? 'paid' : 'unpaid'
+      paymentStatus: delivery.paymentStatus === 'PAID' || delivery.paymentStatus === 'REFUND' ? 'paid' : 'unpaid'
     }));
 
     const formattedCompleted = completedDeliveries.map(delivery => ({
@@ -143,7 +143,7 @@ export const getRiderDashboard = async (req, res) => {
       bottles: delivery.numberOfBottles,
       amount: parseFloat(delivery.totalAmount),
       priority: delivery.priority.toLowerCase(),
-      paymentStatus: delivery.paymentStatus === 'PAID' ? 'paid' : 'unpaid'
+      paymentStatus: delivery.paymentStatus === 'PAID' || delivery.paymentStatus === 'REFUND' ? 'paid' : 'unpaid'
     }));
 
     res.json({

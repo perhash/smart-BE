@@ -157,6 +157,7 @@ enum PaymentStatus {
   NOT_PAID
   OVERPAID
   PARTIAL
+  REFUND
 }
 
 enum PaymentMethod {

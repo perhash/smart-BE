@@ -64,7 +64,7 @@ export const getAllOrders = async (req, res) => {
       priority: order.priority.toLowerCase(),
       rider: order.rider?.name || 'Not assigned',
       date: order.createdAt.toISOString().split('T')[0],
-      paid: order.paymentStatus === 'PAID',
+      paid: order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND',
       paidAmount: parseFloat(order.paidAmount),
       paymentStatus: order.paymentStatus.toLowerCase()
     }));
@@ -273,6 +273,7 @@ export const deliverOrder = async (req, res) => {
     // Determine payment status
     let paymentStatus = 'NOT_PAID';
     if (paid === 0) paymentStatus = 'NOT_PAID';
+    else if (paid < 0) paymentStatus = 'REFUND'; // Refund given to customer
     else if (paid > 0 && paid < total) paymentStatus = 'PARTIAL';
     else if (paid === total) paymentStatus = 'PAID';
     else if (paid > total) paymentStatus = 'OVERPAID';
