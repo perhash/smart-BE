@@ -120,7 +120,22 @@ export const getOrderById = async (req, res) => {
 // Create new order
 export const createOrder = async (req, res) => {
   try {
-    const { customerId, notes, priority = 'NORMAL', numberOfBottles = 1, riderId, unitPrice } = req.body;
+    const { customerId, notes, priority = 'NORMAL', numberOfBottles = 1, riderId, unitPrice, orderType = 'DELIVERY' } = req.body;
+
+    // Validate constraints based on order type
+    if (orderType === 'DELIVERY' && !riderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rider ID is required for delivery orders'
+      });
+    }
+
+    if (orderType === 'WALKIN' && riderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rider ID should not be provided for walk-in orders'
+      });
+    }
 
     // Fetch customer's current balance
     const customer = await prisma.customer.findUnique({
@@ -140,6 +155,14 @@ export const createOrder = async (req, res) => {
     const totalAmount = customerBalance + currentOrderAmount;
 
     const order = await prisma.$transaction(async (tx) => {
+      // Determine initial status based on order type
+      let initialStatus = 'PENDING';
+      if (orderType === 'WALKIN') {
+        initialStatus = 'CREATED';
+      } else if (orderType === 'DELIVERY' && riderId) {
+        initialStatus = 'ASSIGNED';
+      }
+
       // Create the order with new balance tracking fields
       const newOrder = await tx.order.create({
         data: {
@@ -149,9 +172,10 @@ export const createOrder = async (req, res) => {
           customerBalance,
           notes,
           priority: priority.toUpperCase(),
-          riderId: riderId || null,
+          orderType: orderType.toUpperCase(),
+          riderId: orderType === 'DELIVERY' ? riderId : null,
           numberOfBottles: parseInt(numberOfBottles),
-          status: riderId ? 'ASSIGNED' : 'PENDING'
+          status: initialStatus
         },
         include: {
           customer: true
@@ -248,6 +272,87 @@ export const updateOrderStatus = async (req, res) => {
       message: 'Failed to update order',
       error: error.message
     });
+  }
+};
+
+// Complete walk-in order with immediate payment
+export const completeWalkInOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentAmount = 0, paymentMethod = 'CASH', notes } = req.body;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { customer: true }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    if (order.orderType !== 'WALKIN') {
+      return res.status(400).json({ success: false, message: 'This endpoint is only for walk-in orders' });
+    }
+
+    if (order.status !== 'CREATED') {
+      return res.status(400).json({ success: false, message: 'Order is not in CREATED status' });
+    }
+
+    const total = parseFloat(order.totalAmount);
+    const paid = parseFloat(paymentAmount);
+    const remaining = total - paid;
+
+    // Determine payment status
+    let paymentStatus = 'NOT_PAID';
+    if (paid === 0) paymentStatus = 'NOT_PAID';
+    else if (paid < 0) paymentStatus = 'REFUND';
+    else if (paid > 0 && paid < total) paymentStatus = 'PARTIAL';
+    else if (paid === total) paymentStatus = 'PAID';
+    else if (paid > total) paymentStatus = 'OVERPAID';
+
+    // Calculate receivable and payable
+    let receivable = 0;
+    let payable = 0;
+    if (remaining > 0) {
+      receivable = remaining;
+    } else if (remaining < 0) {
+      payable = Math.abs(remaining);
+    }
+
+    // Calculate new customer balance: current balance - paid amount
+    const newCustomerBalance = parseFloat(order.customer.currentBalance) - paid;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedOrder = await tx.order.update({
+        where: { id },
+        data: {
+          status: 'COMPLETED',
+          paidAmount: paid,
+          paymentStatus,
+          paymentMethod,
+          paymentNotes: notes || null,
+          receivable,
+          payable,
+          deliveredAt: new Date()
+        },
+        include: {
+          customer: true,
+          rider: true
+        }
+      });
+
+      await tx.customer.update({
+        where: { id: order.customerId },
+        data: { currentBalance: newCustomerBalance }
+      });
+
+      return updatedOrder;
+    });
+
+    return res.json({ success: true, data: updated, message: 'Walk-in order completed successfully' });
+  } catch (error) {
+    console.error('Error completing walk-in order:', error);
+    return res.status(500).json({ success: false, message: 'Failed to complete walk-in order', error: error.message });
   }
 };
 

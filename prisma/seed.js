@@ -17,8 +17,7 @@ async function main() {
 
     if (existingAdmin) {
       console.log('✅ Admin user already exists, skipping creation');
-      return;
-    }
+    } else {
 
     // Hash the password
     const hashedPassword = await bcrypt.hash('admin123', 12);
@@ -45,7 +44,39 @@ async function main() {
       }
     });
 
-    console.log('✅ Admin profile created:', adminProfile.id);
+      console.log('✅ Admin profile created:', adminProfile.id);
+    }
+
+    // Check if walk-in customer already exists
+    const existingWalkInCustomer = await prisma.customer.findFirst({
+      where: {
+        name: 'Walk-in Customer'
+      }
+    });
+
+    if (!existingWalkInCustomer) {
+      // Create walk-in customer
+      const walkInCustomer = await prisma.customer.create({
+        data: {
+          name: 'Walk-in Customer',
+          phone: '000-000-0000',
+          whatsapp: '000-000-0000',
+          houseNo: 'Store',
+          streetNo: '1',
+          area: 'Main Area',
+          city: 'City',
+          bottleCount: 0,
+          avgDaysToRefill: null,
+          isActive: true,
+          currentBalance: 0
+        }
+      });
+
+      console.log('✅ Walk-in customer created:', walkInCustomer.id);
+    } else {
+      console.log('✅ Walk-in customer already exists');
+    }
+
     console.log('🎉 Database seeding completed successfully!');
     console.log('📧 Admin Email: admin@smartsupply.com');
     console.log('🔑 Admin Password: admin123');

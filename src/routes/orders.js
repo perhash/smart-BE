@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllOrders, getOrderById, createOrder, updateOrderStatus, updateOrder, deliverOrder, cancelOrder } from '../controllers/orderController.js';
+import { getAllOrders, getOrderById, createOrder, updateOrderStatus, updateOrder, deliverOrder, cancelOrder, completeWalkInOrder } from '../controllers/orderController.js';
 
 const router = express.Router();
 
@@ -23,5 +23,8 @@ router.post('/:id/deliver', deliverOrder);
 
 // POST /api/orders/:id/cancel
 router.post('/:id/cancel', cancelOrder);
+
+// POST /api/orders/:id/complete-walkin
+router.post('/:id/complete-walkin', completeWalkInOrder);
 
 export default router;
