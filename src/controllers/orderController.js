@@ -588,14 +588,19 @@ export const clearBill = async (req, res) => {
       
       if (remainingReceivable === 0) {
         paymentStatus = 'PAID';
+        receivable = 0;  // Fully paid, no remaining receivable
+        payable = 0;
       } else if (remainingReceivable < 0) {
         paymentStatus = 'OVERPAID';
         receivable = 0;
         payable = Math.abs(remainingReceivable);
       } else if (paid > 0) {
         paymentStatus = 'PARTIAL';
+        receivable = remainingReceivable;  // Set to remaining amount
+        payable = 0;
       } else {
         paymentStatus = 'NOT_PAID';
+        payable = 0;
       }
     } else {
       // Payable case - we owe customer (negative balance)
@@ -604,14 +609,19 @@ export const clearBill = async (req, res) => {
       
       if (remainingPayable === 0) {
         paymentStatus = 'PAID';
+        payable = 0;  // Fully paid, no remaining payable
+        receivable = 0;
       } else if (remainingPayable < 0) {
         paymentStatus = 'OVERPAID';
         payable = 0;
         receivable = Math.abs(remainingPayable);
       } else if (paid > 0) {
         paymentStatus = 'PARTIAL';
+        payable = remainingPayable;  // Set to remaining amount
+        receivable = 0;
       } else {
         paymentStatus = 'NOT_PAID';
+        receivable = 0;
       }
       
       // For payable, paidAmount should be negative
