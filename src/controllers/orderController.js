@@ -530,3 +530,143 @@ export const updateOrder = async (req, res) => {
     });
   }
 };
+
+// Clear bill - Create CLEARBILL order and mark as completed immediately
+export const clearBill = async (req, res) => {
+  try {
+    const { customerId, paidAmount, paymentMethod = 'CASH', paymentNotes, priority = 'NORMAL' } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer ID is required'
+      });
+    }
+
+    if (paidAmount === undefined || paidAmount === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Paid amount is required'
+      });
+    }
+
+    // Fetch customer
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, name: true, currentBalance: true }
+    });
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found'
+      });
+    }
+
+    const customerBalance = parseFloat(customer.currentBalance);
+    const paid = parseFloat(paidAmount);
+
+    // If customer balance is zero, nothing to clear
+    if (customerBalance === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer balance is already zero'
+      });
+    }
+
+    // Determine if it's receivable or payable
+    let receivable = 0;
+    let payable = 0;
+    let totalAmount = customerBalance;
+    let paymentStatus = 'NOT_PAID';
+    let adjustedPaid = paid;
+
+    if (customerBalance > 0) {
+      // Receivable case - customer owes us (positive balance)
+      receivable = customerBalance;
+      const remainingReceivable = receivable - paid;
+      
+      if (remainingReceivable === 0) {
+        paymentStatus = 'PAID';
+      } else if (remainingReceivable < 0) {
+        paymentStatus = 'OVERPAID';
+        receivable = 0;
+        payable = Math.abs(remainingReceivable);
+      } else if (paid > 0) {
+        paymentStatus = 'PARTIAL';
+      } else {
+        paymentStatus = 'NOT_PAID';
+      }
+    } else {
+      // Payable case - we owe customer (negative balance)
+      payable = Math.abs(customerBalance);
+      const remainingPayable = payable - paid;
+      
+      if (remainingPayable === 0) {
+        paymentStatus = 'PAID';
+      } else if (remainingPayable < 0) {
+        paymentStatus = 'OVERPAID';
+        payable = 0;
+        receivable = Math.abs(remainingPayable);
+      } else if (paid > 0) {
+        paymentStatus = 'PARTIAL';
+      } else {
+        paymentStatus = 'NOT_PAID';
+      }
+      
+      // For payable, paidAmount should be negative
+      adjustedPaid = -paid;
+    }
+
+    // Calculate new customer balance: oldBalance - paidAmount
+    const newCustomerBalance = customerBalance - adjustedPaid;
+
+    const order = await prisma.$transaction(async (tx) => {
+      // Create the CLEARBILL order and mark as completed immediately
+      const newOrder = await tx.order.create({
+        data: {
+          customerId: customer.id,
+          orderType: 'CLEARBILL',
+          status: 'COMPLETED',
+          numberOfBottles: 0,
+          currentOrderAmount: 0,
+          customerBalance: customerBalance,
+          totalAmount: totalAmount,
+          paidAmount: adjustedPaid,
+          paymentStatus,
+          paymentMethod: paymentMethod.toUpperCase(),
+          paymentNotes: paymentNotes || null,
+          receivable,
+          payable,
+          priority: priority.toUpperCase(),
+          deliveredAt: new Date()
+        },
+        include: {
+          customer: true,
+          rider: true
+        }
+      });
+
+      // Update customer's current balance
+      await tx.customer.update({
+        where: { id: customer.id },
+        data: { currentBalance: newCustomerBalance }
+      });
+
+      return newOrder;
+    });
+
+    res.status(201).json({
+      success: true,
+      data: order,
+      message: 'Bill cleared successfully'
+    });
+  } catch (error) {
+    console.error('Error clearing bill:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear bill',
+      error: error.message
+    });
+  }
+};

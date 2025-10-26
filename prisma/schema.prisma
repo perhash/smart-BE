@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,25 +8,21 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// User model for authentication and role management
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  phone     String?  @unique
-  password  String
-  role      UserRole @default(ADMIN)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
+  id           String        @id @default(cuid())
+  email        String        @unique
+  phone        String?       @unique
+  password     String
+  role         UserRole      @default(ADMIN)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   adminProfile AdminProfile?
   riderProfile RiderProfile?
 
   @@map("users")
 }
 
-// Admin/Supplier profile
 model AdminProfile {
   id        String   @id @default(cuid())
   userId    String   @unique
@@ -37,14 +30,11 @@ model AdminProfile {
   company   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("admin_profiles")
 }
 
-// Rider profile
 model RiderProfile {
   id        String   @id @default(cuid())
   userId    String   @unique
@@ -53,85 +43,72 @@ model RiderProfile {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders   Order[]
+  orders    Order[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("rider_profiles")
 }
 
-// Customer model
 model Customer {
-  id          String   @id @default(cuid())
-  name        String
-  phone       String   @unique
-  whatsapp    String?  // WhatsApp number (optional)
-  houseNo     String?  // House number
-  streetNo    String?  // Street number
-  area        String?  // Area/neighborhood
-  city        String?
-  bottleCount Int      @default(0) // Number of bottles customer has
-  avgDaysToRefill Int? // Average days between refills (optional)
-  isActive    Boolean  @default(true)
-  currentBalance Decimal @default(0) // Current balance (can be negative or positive)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  orders   Order[]
+  id              String   @id @default(cuid())
+  name            String
+  phone           String   @unique
+  houseNo         String?
+  streetNo        String?
+  area            String?
+  city            String?
+  isActive        Boolean  @default(true)
+  currentBalance  Decimal  @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  whatsapp        String?
+  bottleCount     Int      @default(0)
+  avgDaysToRefill Int?
+  orders          Order[]
 
   @@map("customers")
 }
 
-// Order model
 model Order {
-  id          String      @id @default(cuid())
-  customerId  String
-  riderId     String?     // Required for DELIVERY orders, optional for WALKIN
-  orderType   OrderType   @default(DELIVERY)
-  status      OrderStatus @default(PENDING)
-  priority    Priority    @default(NORMAL)
-  notes       String?
-  totalAmount Decimal
-  numberOfBottles Int     @default(1) // Number of bottles in this order
-  // Payment fields
-  paidAmount      Decimal       @default(0)
-  paymentStatus   PaymentStatus @default(NOT_PAID)
-  paymentMethod   PaymentMethod @default(CASH)
-  paymentNotes    String?
-  // Balance tracking fields
-  customerBalance Decimal       @default(0) // Customer balance at time of order creation
-  currentOrderAmount Decimal    @default(0) // Bottles × unit price
-  payable    Decimal           @default(0) // Amount we owe customer (if overpaid)
-  receivable Decimal           @default(0) // Amount customer owes us (if underpaid)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  deliveredAt DateTime?
-
-  // Relations
-  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  rider    RiderProfile? @relation(fields: [riderId], references: [id], onDelete: SetNull)
+  id                 String        @id @default(cuid())
+  customerId         String
+  riderId            String?
+  status             OrderStatus   @default(PENDING)
+  priority           Priority      @default(NORMAL)
+  notes              String?
+  totalAmount        Decimal
+  paidAmount         Decimal       @default(0)
+  paymentStatus      PaymentStatus @default(NOT_PAID)
+  paymentMethod      PaymentMethod @default(CASH)
+  paymentNotes       String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  deliveredAt        DateTime?
+  numberOfBottles    Int           @default(1)
+  currentOrderAmount Decimal       @default(0)
+  customerBalance    Decimal       @default(0)
+  payable            Decimal       @default(0)
+  receivable         Decimal       @default(0)
+  orderType          OrderType     @default(DELIVERY)
+  customer           Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rider              RiderProfile? @relation(fields: [riderId], references: [id])
 
   @@map("orders")
 }
 
-
-// Notification model for push notifications
 model Notification {
   id        String           @id @default(cuid())
-  userId    String?          // If null, it's a system-wide notification
+  userId    String?
   title     String
   message   String
   type      NotificationType
   isRead    Boolean          @default(false)
-  data      Json?            // Additional data for the notification
+  data      Json?
   createdAt DateTime         @default(now())
 
   @@map("notifications")
 }
 
-// Enums
 enum UserRole {
   ADMIN
   RIDER
@@ -152,6 +129,7 @@ enum OrderStatus {
 enum OrderType {
   WALKIN
   DELIVERY
+  CLEARBILL
 }
 
 enum Priority {
@@ -186,4 +164,3 @@ enum NotificationType {
   PAYMENT_OVERDUE
   SYSTEM_UPDATE
 }
-
