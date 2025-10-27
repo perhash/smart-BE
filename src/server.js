@@ -20,14 +20,12 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     
     const allowedOrigins = [
-      // Local development (only in development mode)
-      ...(process.env.NODE_ENV === 'development' ? [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:8080',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:8080'
-      ] : []),
+      // Local development (always allow in development)
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8080',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
       // Environment-based URLs
       process.env.FRONTEND_URL,
       process.env.VERCEL_FRONTEND_URL,

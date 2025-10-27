@@ -433,6 +433,42 @@ export const deliverOrder = async (req, res) => {
       return updatedOrder;
     });
 
+    // Create notification for all admin users
+    try {
+      const adminUsers = await prisma.user.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true }
+      });
+
+      for (const adminUser of adminUsers) {
+        await prisma.notification.create({
+          data: {
+            userId: adminUser.id,
+            title: 'Order Delivered',
+            message: `Order #${id} has been delivered by ${updated.rider?.name || 'Rider'}`,
+            type: 'ORDER_DELIVERED',
+            data: {
+              orderId: id,
+              customer: {
+                id: order.customerId,
+                name: updated.customer.name,
+                phone: updated.customer.phone
+              },
+              rider: updated.rider ? {
+                id: updated.rider.id,
+                name: updated.rider.name
+              } : null,
+              paymentAmount: paid,
+              paymentStatus,
+              totalAmount: total
+            }
+          }
+        });
+      }
+    } catch (notifyErr) {
+      console.error('Failed to create admin notification:', notifyErr);
+    }
+
     return res.json({ success: true, data: updated, message: 'Order delivered and balances updated' });
   } catch (error) {
     console.error('Error delivering order:', error);

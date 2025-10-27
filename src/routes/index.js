@@ -5,12 +5,14 @@ import orderRoutes from './orders.js';
 import customerRoutes from './customers.js';
 import riderRoutes from './riders.js';
 import paymentRoutes from './payments.js';
+import notificationRoutes from './notifications.js';
 
 const router = express.Router();
 
 // API routes
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/notifications', notificationRoutes);
 router.use('/orders', orderRoutes);
 router.use('/customers', customerRoutes);
 router.use('/riders', riderRoutes);
