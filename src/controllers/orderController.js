@@ -732,3 +732,75 @@ export const clearBill = async (req, res) => {
     });
   }
 };
+
+// Amend an in-progress order (PENDING/ASSIGNED) by reverting customer balance to snapshot,
+// recalculating the order amount, and reapplying the provisional balance.
+export const amendOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { numberOfBottles, unitPrice, notes, priority, riderId } = req.body;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: { customer: true }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Only allow amendments for non-delivered/cancelled
+    const editableStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS'];
+    if (!editableStatuses.includes(order.status)) {
+      return res.status(400).json({ success: false, message: 'Only in-progress orders can be amended' });
+    }
+
+    // Required inputs
+    if (numberOfBottles === undefined || unitPrice === undefined) {
+      return res.status(400).json({ success: false, message: 'numberOfBottles and unitPrice are required' });
+    }
+
+    // Revert: take customer back to snapshot balance recorded on the order
+    const snapshotBalance = parseFloat(order.customerBalance);
+    const newCurrentOrderAmount = parseFloat(numberOfBottles) * parseFloat(unitPrice);
+    // Create uses: totalAmount = customerBalance (snapshot) + currentOrderAmount
+    const newTotalAmount = snapshotBalance + newCurrentOrderAmount;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Revert customer balance to snapshot first
+      await tx.customer.update({
+        where: { id: order.customerId },
+        data: { currentBalance: snapshotBalance }
+      });
+
+      // Update the order in place (same id)
+      const updatedOrder = await tx.order.update({
+        where: { id },
+        data: {
+          // Keep snapshot as-is (order.customerBalance)
+          numberOfBottles: parseInt(numberOfBottles),
+          totalAmount: newTotalAmount,
+          currentOrderAmount: newCurrentOrderAmount,
+          ...(notes !== undefined ? { notes } : {}),
+          ...(priority !== undefined ? { priority: String(priority).toUpperCase() } : {}),
+          ...(riderId !== undefined ? { riderId } : {})
+        },
+        include: { customer: true, rider: true }
+      });
+
+      // Reapply provisional balance after amendment
+      const finalCustomerBalance = newTotalAmount; // snapshot + currentOrderAmount
+      await tx.customer.update({
+        where: { id: order.customerId },
+        data: { currentBalance: finalCustomerBalance }
+      });
+
+      return updatedOrder;
+    });
+
+    return res.json({ success: true, data: updated, message: 'Order amended successfully' });
+  } catch (error) {
+    console.error('Error amending order:', error);
+    return res.status(500).json({ success: false, message: 'Failed to amend order', error: error.message });
+  }
+};
