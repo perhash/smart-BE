@@ -143,6 +143,7 @@ export const getRiderDashboard = async (req, res) => {
       bottles: delivery.numberOfBottles,
       amount: parseFloat(delivery.totalAmount),
       paidAmount: parseFloat(delivery.paidAmount),
+      currentOrderAmount: parseFloat(delivery.currentOrderAmount),
       priority: delivery.priority.toLowerCase(),
       paymentStatus: delivery.paymentStatus
     }));

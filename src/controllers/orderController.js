@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 // Get all orders
 export const getAllOrders = async (req, res) => {
   try {
-    const { status, date, riderId, startDate, endDate } = req.query;
+    const { status, date, riderId, startDate, endDate, page, limit } = req.query;
 
     const whereClause = {
       ...(status && status !== 'all' ? { status: status.toUpperCase() } : {}),
@@ -40,17 +40,27 @@ export const getAllOrders = async (req, res) => {
         : {})
     };
 
+    // Calculate pagination
+    const pageNum = page ? parseInt(page) : 1;
+    const pageLimit = limit ? parseInt(limit) : 50;
+    const skip = (pageNum - 1) * pageLimit;
+
+    // Get total count for pagination
+    const total = await prisma.order.count({ where: whereClause });
+
     const orders = await prisma.order.findMany({
       where: whereClause,
       include: {
         customer: {
-          select: { name: true, phone: true }
+          select: { name: true, phone: true, houseNo: true, streetNo: true, area: true, city: true }
         },
         rider: {
           select: { name: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      skip: skip,
+      take: pageLimit
     });
 
     const formattedOrders = orders.map(order => ({
@@ -66,12 +76,18 @@ export const getAllOrders = async (req, res) => {
       date: order.createdAt.toISOString().split('T')[0],
       paid: order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND',
       paidAmount: parseFloat(order.paidAmount),
-      paymentStatus: order.paymentStatus.toLowerCase()
+      paymentStatus: order.paymentStatus.toLowerCase(),
+      address: [order.customer.houseNo, order.customer.streetNo, order.customer.area, order.customer.city]
+        .filter(Boolean).join(' ')
     }));
 
     res.json({
       success: true,
-      data: formattedOrders
+      data: formattedOrders,
+      total: total,
+      page: pageNum,
+      limit: pageLimit,
+      totalPages: Math.ceil(total / pageLimit)
     });
   } catch (error) {
     console.error('Error fetching orders:', error);
