@@ -7,6 +7,7 @@ import riderRoutes from './riders.js';
 import paymentRoutes from './payments.js';
 import notificationRoutes from './notifications.js';
 import reportsRoutes from './reports.js';
+import dailyClosingsRoutes from './dailyClosings.js';
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.use('/customers', customerRoutes);
 router.use('/riders', riderRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/reports', reportsRoutes);
+router.use('/daily-closings', dailyClosingsRoutes);
 
 export default router;

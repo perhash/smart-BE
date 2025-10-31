@@ -111,3 +111,16 @@ export function formatPktDate(utcDate) {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Get today's date string in PKT (YYYY-MM-DD)
+ * @returns {string} Today's date in YYYY-MM-DD format
+ */
+export function getTodayPktDate() {
+  const now = new Date();
+  const pktNow = new Date(now.getTime() + (PKT_OFFSET_HOURS * 60 * 60 * 1000));
+  const year = pktNow.getUTCFullYear();
+  const month = String(pktNow.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(pktNow.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+

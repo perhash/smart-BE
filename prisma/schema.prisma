@@ -109,6 +109,22 @@ model Notification {
   @@map("notifications")
 }
 
+model DailyClosing {
+  id                       String   @id @default(cuid())
+  date                     DateTime @unique
+  customerPayable          Decimal  @default(0)
+  customerReceivable       Decimal  @default(0)
+  totalPaidAmount          Decimal  @default(0)
+  totalCurrentOrderAmount  Decimal  @default(0)
+  balanceClearedToday      Decimal  @default(0)
+  totalBottles             Int      @default(0)
+  totalOrders              Int      @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("daily_closings")
+}
+
 enum UserRole {
   ADMIN
   RIDER
