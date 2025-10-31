@@ -36,15 +36,16 @@ model AdminProfile {
 }
 
 model RiderProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  name      String
-  phone     String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  orders    Order[]
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String               @id @default(cuid())
+  userId            String               @unique
+  name              String
+  phone             String
+  isActive          Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  orders            Order[]
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyCollections  DailyClosingRider[]
 
   @@map("rider_profiles")
 }
@@ -110,19 +111,52 @@ model Notification {
 }
 
 model DailyClosing {
-  id                       String   @id @default(cuid())
-  date                     DateTime @unique
-  customerPayable          Decimal  @default(0)
-  customerReceivable       Decimal  @default(0)
-  totalPaidAmount          Decimal  @default(0)
-  totalCurrentOrderAmount  Decimal  @default(0)
-  balanceClearedToday      Decimal  @default(0)
-  totalBottles             Int      @default(0)
-  totalOrders              Int      @default(0)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                       String                     @id @default(cuid())
+  date                     DateTime                   @unique
+  customerPayable          Decimal                    @default(0)
+  customerReceivable       Decimal                    @default(0)
+  totalPaidAmount          Decimal                    @default(0)
+  totalCurrentOrderAmount  Decimal                    @default(0)
+  walkInAmount             Decimal                    @default(0)
+  clearBillAmount          Decimal                    @default(0)
+  balanceClearedToday      Decimal                    @default(0)
+  totalBottles             Int                        @default(0)
+  totalOrders              Int                        @default(0)
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  riderCollections         DailyClosingRider[]
+  paymentMethods           DailyClosingPayment[]
 
   @@map("daily_closings")
+}
+
+model DailyClosingRider {
+  id              String       @id @default(cuid())
+  dailyClosingId  String
+  riderId         String
+  amount          Decimal      @default(0)
+  ordersCount     Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  dailyClosing    DailyClosing @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
+  rider           RiderProfile @relation(fields: [riderId], references: [id])
+
+  @@unique([dailyClosingId, riderId])
+  @@map("daily_closing_riders")
+}
+
+model DailyClosingPayment {
+  id              String       @id @default(cuid())
+  dailyClosingId  String
+  paymentMethod   PaymentMethod
+  amount          Decimal      @default(0)
+  ordersCount     Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  dailyClosing    DailyClosing @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyClosingId, paymentMethod])
+  @@map("daily_closing_payments")
 }
 
 enum UserRole {

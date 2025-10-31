@@ -36,7 +36,7 @@ export const getDailyClosingSummary = async (req, res) => {
       .filter(c => parseFloat(c.currentBalance) > 0)
       .reduce((sum, c) => sum + parseFloat(c.currentBalance), 0);
 
-    // Get today's orders (excluding cancelled)
+    // Get today's orders (excluding cancelled) with more details
     const todayOrders = await prisma.order.findMany({
       where: {
         createdAt: {
@@ -50,7 +50,10 @@ export const getDailyClosingSummary = async (req, res) => {
       select: {
         paidAmount: true,
         currentOrderAmount: true,
-        numberOfBottles: true
+        numberOfBottles: true,
+        riderId: true,
+        paymentMethod: true,
+        orderType: true
       }
     });
 
@@ -65,6 +68,14 @@ export const getDailyClosingSummary = async (req, res) => {
       0
     );
 
+    const walkInAmount = todayOrders
+      .filter(order => order.orderType === 'WALKIN')
+      .reduce((sum, order) => sum + parseFloat(order.paidAmount), 0);
+
+    const clearBillAmount = todayOrders
+      .filter(order => order.orderType === 'CLEARBILL')
+      .reduce((sum, order) => sum + parseFloat(order.paidAmount), 0);
+
     const balanceClearedToday = totalCurrentOrderAmount - totalPaidAmount;
 
     const totalBottles = todayOrders.reduce(
@@ -73,6 +84,60 @@ export const getDailyClosingSummary = async (req, res) => {
     );
 
     const totalOrders = todayOrders.length;
+
+    // Group by rider for collections
+    const riderCollectionsMap = new Map();
+    todayOrders.forEach(order => {
+      if (!order.riderId) return; // Skip orders without riders
+      if (riderCollectionsMap.has(order.riderId)) {
+        const existing = riderCollectionsMap.get(order.riderId);
+        existing.amount += parseFloat(order.paidAmount);
+        existing.ordersCount += 1;
+      } else {
+        riderCollectionsMap.set(order.riderId, {
+          amount: parseFloat(order.paidAmount),
+          ordersCount: 1
+        });
+      }
+    });
+
+    // Fetch rider names
+    const riderIds = Array.from(riderCollectionsMap.keys());
+    const riders = await prisma.riderProfile.findMany({
+      where: { id: { in: riderIds } },
+      select: { id: true, name: true }
+    });
+
+    const ridersMap = new Map(riders.map(r => [r.id, r.name]));
+
+    const riderCollections = Array.from(riderCollectionsMap.entries()).map(([riderId, data]) => ({
+      riderId,
+      riderName: ridersMap.get(riderId) || 'Unknown',
+      amount: data.amount,
+      ordersCount: data.ordersCount
+    }));
+
+    // Group by payment method
+    const paymentMethodsMap = new Map();
+    todayOrders.forEach(order => {
+      const method = order.paymentMethod;
+      if (paymentMethodsMap.has(method)) {
+        const existing = paymentMethodsMap.get(method);
+        existing.amount += parseFloat(order.paidAmount);
+        existing.ordersCount += 1;
+      } else {
+        paymentMethodsMap.set(method, {
+          amount: parseFloat(order.paidAmount),
+          ordersCount: 1
+        });
+      }
+    });
+
+    const paymentMethods = Array.from(paymentMethodsMap.entries()).map(([method, data]) => ({
+      method,
+      amount: data.amount,
+      ordersCount: data.ordersCount
+    }));
 
     // Check if closing already exists for today
     const existingClosing = await prisma.dailyClosing.findUnique({
@@ -89,9 +154,13 @@ export const getDailyClosingSummary = async (req, res) => {
         customerReceivable,
         totalPaidAmount,
         totalCurrentOrderAmount,
+        walkInAmount,
+        clearBillAmount,
         balanceClearedToday,
         totalBottles,
         totalOrders,
+        riderCollections,
+        paymentMethods,
         canClose: inProgressOrders === 0,
         inProgressOrdersCount: inProgressOrders,
         alreadyExists: !!existingClosing
@@ -147,7 +216,7 @@ export const saveDailyClosing = async (req, res) => {
       .filter(c => parseFloat(c.currentBalance) > 0)
       .reduce((sum, c) => sum + parseFloat(c.currentBalance), 0);
 
-    // Get today's orders (excluding cancelled)
+    // Get today's orders (excluding cancelled) with more details
     const todayOrders = await prisma.order.findMany({
       where: {
         createdAt: {
@@ -161,7 +230,10 @@ export const saveDailyClosing = async (req, res) => {
       select: {
         paidAmount: true,
         currentOrderAmount: true,
-        numberOfBottles: true
+        numberOfBottles: true,
+        riderId: true,
+        paymentMethod: true,
+        orderType: true
       }
     });
 
@@ -176,6 +248,14 @@ export const saveDailyClosing = async (req, res) => {
       0
     );
 
+    const walkInAmount = todayOrders
+      .filter(order => order.orderType === 'WALKIN')
+      .reduce((sum, order) => sum + parseFloat(order.paidAmount), 0);
+
+    const clearBillAmount = todayOrders
+      .filter(order => order.orderType === 'CLEARBILL')
+      .reduce((sum, order) => sum + parseFloat(order.paidAmount), 0);
+
     const balanceClearedToday = totalCurrentOrderAmount - totalPaidAmount;
 
     const totalBottles = todayOrders.reduce(
@@ -184,6 +264,38 @@ export const saveDailyClosing = async (req, res) => {
     );
 
     const totalOrders = todayOrders.length;
+
+    // Group by rider for collections
+    const riderCollectionsMap = new Map();
+    todayOrders.forEach(order => {
+      if (!order.riderId) return; // Skip orders without riders
+      if (riderCollectionsMap.has(order.riderId)) {
+        const existing = riderCollectionsMap.get(order.riderId);
+        existing.amount += parseFloat(order.paidAmount);
+        existing.ordersCount += 1;
+      } else {
+        riderCollectionsMap.set(order.riderId, {
+          amount: parseFloat(order.paidAmount),
+          ordersCount: 1
+        });
+      }
+    });
+
+    // Group by payment method
+    const paymentMethodsMap = new Map();
+    todayOrders.forEach(order => {
+      const method = order.paymentMethod;
+      if (paymentMethodsMap.has(method)) {
+        const existing = paymentMethodsMap.get(method);
+        existing.amount += parseFloat(order.paidAmount);
+        existing.ordersCount += 1;
+      } else {
+        paymentMethodsMap.set(method, {
+          amount: parseFloat(order.paidAmount),
+          ordersCount: 1
+        });
+      }
+    });
 
     // Create or update the daily closing
     const closingDate = new Date(todayPktDate + 'T00:00:00Z');
@@ -197,9 +309,18 @@ export const saveDailyClosing = async (req, res) => {
         customerReceivable,
         totalPaidAmount,
         totalCurrentOrderAmount,
+        walkInAmount,
+        clearBillAmount,
         balanceClearedToday,
         totalBottles,
-        totalOrders
+        totalOrders,
+        // Delete old rider collections and payment methods
+        riderCollections: {
+          deleteMany: {}
+        },
+        paymentMethods: {
+          deleteMany: {}
+        }
       },
       create: {
         date: closingDate,
@@ -207,16 +328,61 @@ export const saveDailyClosing = async (req, res) => {
         customerReceivable,
         totalPaidAmount,
         totalCurrentOrderAmount,
+        walkInAmount,
+        clearBillAmount,
         balanceClearedToday,
         totalBottles,
         totalOrders
       }
     });
 
+    // Create rider collections
+    const riderCollections = Array.from(riderCollectionsMap.entries()).map(([riderId, data]) => ({
+      dailyClosingId: dailyClosing.id,
+      riderId: riderId,
+      amount: data.amount,
+      ordersCount: data.ordersCount
+    }));
+
+    if (riderCollections.length > 0) {
+      await prisma.dailyClosingRider.createMany({
+        data: riderCollections
+      });
+    }
+
+    // Create payment method breakdowns
+    const paymentMethods = Array.from(paymentMethodsMap.entries()).map(([method, data]) => ({
+      dailyClosingId: dailyClosing.id,
+      paymentMethod: method,
+      amount: data.amount,
+      ordersCount: data.ordersCount
+    }));
+
+    if (paymentMethods.length > 0) {
+      await prisma.dailyClosingPayment.createMany({
+        data: paymentMethods
+      });
+    }
+
+    // Fetch the complete closing with relations
+    const completeClosing = await prisma.dailyClosing.findUnique({
+      where: { id: dailyClosing.id },
+      include: {
+        riderCollections: {
+          include: {
+            rider: {
+              select: { name: true }
+            }
+          }
+        },
+        paymentMethods: true
+      }
+    });
+
     res.json({
       success: true,
       message: 'Daily closing saved successfully',
-      data: dailyClosing
+      data: completeClosing
     });
   } catch (error) {
     console.error('Error saving daily closing:', error);
@@ -234,6 +400,16 @@ export const getAllDailyClosings = async (req, res) => {
     const dailyClosings = await prisma.dailyClosing.findMany({
       orderBy: {
         date: 'desc'
+      },
+      include: {
+        riderCollections: {
+          include: {
+            rider: {
+              select: { name: true }
+            }
+          }
+        },
+        paymentMethods: true
       }
     });
 
@@ -244,9 +420,21 @@ export const getAllDailyClosings = async (req, res) => {
       customerReceivable: parseFloat(closing.customerReceivable),
       totalPaidAmount: parseFloat(closing.totalPaidAmount),
       totalCurrentOrderAmount: parseFloat(closing.totalCurrentOrderAmount),
+      walkInAmount: parseFloat(closing.walkInAmount),
+      clearBillAmount: parseFloat(closing.clearBillAmount),
       balanceClearedToday: parseFloat(closing.balanceClearedToday),
       totalBottles: closing.totalBottles,
       totalOrders: closing.totalOrders,
+      riderCollections: closing.riderCollections.map(rc => ({
+        riderName: rc.rider?.name || 'Unknown',
+        amount: parseFloat(rc.amount),
+        ordersCount: rc.ordersCount
+      })),
+      paymentMethods: closing.paymentMethods.map(pm => ({
+        method: pm.paymentMethod,
+        amount: parseFloat(pm.amount),
+        ordersCount: pm.ordersCount
+      })),
       createdAt: closing.createdAt,
       updatedAt: closing.updatedAt
     }));
