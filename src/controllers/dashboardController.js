@@ -68,7 +68,16 @@ export const getDashboardStats = async (req, res) => {
 // Get recent activities
 export const getRecentActivities = async (req, res) => {
   try {
+    // Only get today's orders in PKT timezone
+    const todayRange = getTodayPktUtcRange();
+
     const recentOrders = await prisma.order.findMany({
+      where: {
+        createdAt: {
+          gte: todayRange.start,
+          lte: todayRange.end
+        }
+      },
       take: 10,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -81,14 +90,27 @@ export const getRecentActivities = async (req, res) => {
       }
     });
 
-    const activities = recentOrders.map(order => ({
-      id: order.id,
-      text: `Order #${order.id.slice(-4)} from ${order.customer.name}`,
-      time: order.createdAt, // Frontend will format this
-      date: formatPktDate(order.createdAt), // Add PKT date for reference
-      status: order.status.toLowerCase(),
-      type: 'order'
-    }));
+    const activities = recentOrders.map(order => {
+      // Convert Prisma Decimal to number - Decimal types need toString() first
+      const totalAmount = order.totalAmount ? parseFloat(order.totalAmount.toString()) : 0;
+      const paidAmount = order.paidAmount ? parseFloat(order.paidAmount.toString()) : 0;
+      
+      // orderType is enum: WALKIN, DELIVERY, CLEARBILL
+      const orderType = order.orderType || 'DELIVERY';
+      
+      return {
+        id: order.id,
+        text: `Order #${order.id.slice(-4)} from ${order.customer.name}`,
+        time: order.createdAt, // Frontend will format this
+        date: formatPktDate(order.createdAt), // Add PKT date for reference
+        status: order.status.toLowerCase(),
+        type: 'order',
+        orderType: orderType, // Keep as enum: WALKIN, DELIVERY, CLEARBILL
+        totalAmount: totalAmount,
+        paidAmount: paidAmount,
+        deliveredAt: order.deliveredAt || null // Will be formatted in PKT on frontend
+      };
+    });
 
     res.json({
       success: true,
