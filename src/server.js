@@ -1,3 +1,6 @@
+// Set timezone to Asia/Karachi (PKT) for all date operations
+process.env.TZ = 'Asia/Karachi';
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
