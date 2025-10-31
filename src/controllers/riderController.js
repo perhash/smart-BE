@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { formatPktDate } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
@@ -43,7 +44,7 @@ export const getAllRiders = async (req, res) => {
         amount: parseFloat(order.totalAmount),
         status: order.status.toLowerCase()
       })),
-      createdAt: rider.createdAt.toISOString().split('T')[0]
+      createdAt: formatPktDate(rider.createdAt)
     }));
 
     res.json({
@@ -87,9 +88,21 @@ export const getRiderById = async (req, res) => {
       });
     }
 
+    // Format dates in PKT for orders
+    const formattedRider = {
+      ...rider,
+      createdAt: formatPktDate(rider.createdAt),
+      orders: rider.orders.map(order => ({
+        ...order,
+        createdAt: formatPktDate(order.createdAt),
+        deliveredAt: order.deliveredAt ? formatPktDate(order.deliveredAt) : null,
+        updatedAt: formatPktDate(order.updatedAt)
+      }))
+    };
+
     res.json({
       success: true,
-      data: rider
+      data: formattedRider
     });
   } catch (error) {
     console.error('Error fetching rider:', error);
