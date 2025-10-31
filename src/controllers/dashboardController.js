@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getTodayPktUtcRange } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
@@ -15,17 +16,14 @@ export const getDashboardStats = async (req, res) => {
       where: { isActive: true }
     });
 
-    // Get today's orders
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get today's orders (using PKT timezone)
+    const todayRange = getTodayPktUtcRange();
 
     const ordersToday = await prisma.order.count({
       where: {
         createdAt: {
-          gte: today,
-          lt: tomorrow
+          gte: todayRange.start,
+          lte: todayRange.end
         }
       }
     });

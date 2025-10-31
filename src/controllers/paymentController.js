@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { formatPktDate } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
@@ -32,8 +33,8 @@ export const getAllPayments = async (req, res) => {
       paidAmount: parseFloat(order.paidAmount),
       paymentStatus: order.paymentStatus.toLowerCase(),
       paymentMethod: order.paymentMethod.toLowerCase(),
-      createdAt: order.createdAt.toISOString().split('T')[0],
-      deliveredAt: order.deliveredAt?.toISOString().split('T')[0] || null
+      createdAt: formatPktDate(order.createdAt),
+      deliveredAt: order.deliveredAt ? formatPktDate(order.deliveredAt) : null
     }));
 
     res.json({

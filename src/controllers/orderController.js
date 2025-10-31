@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPktDateRangeUtc, getPktDayStartUtc, getPktDayEndUtc, formatPktDate } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
@@ -11,30 +12,33 @@ export const getAllOrders = async (req, res) => {
       ...(status && status !== 'all' ? { status: status.toUpperCase() } : {}),
       ...(riderId ? { riderId } : {}),
       ...(date
-        ? {
-            createdAt: {
-              gte: new Date(new Date(date).setHours(0, 0, 0, 0)),
-              lt: new Date(new Date(date).setHours(24, 0, 0, 0))
-            }
-          }
+        ? (() => {
+            const dateRange = getPktDateRangeUtc(date);
+            return {
+              createdAt: {
+                gte: dateRange.start,
+                lte: dateRange.end
+              }
+            };
+          })()
         : {}),
       ...(startDate && endDate
         ? {
             createdAt: {
-              gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
-              lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+              gte: getPktDayStartUtc(startDate),
+              lte: getPktDayEndUtc(endDate)
             }
           }
         : startDate
         ? {
             createdAt: {
-              gte: new Date(new Date(startDate).setHours(0, 0, 0, 0))
+              gte: getPktDayStartUtc(startDate)
             }
           }
         : endDate
         ? {
             createdAt: {
-              lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+              lte: getPktDayEndUtc(endDate)
             }
           }
         : {})
@@ -73,7 +77,7 @@ export const getAllOrders = async (req, res) => {
       status: order.status.toLowerCase(),
       priority: order.priority.toLowerCase(),
       rider: order.rider?.name || 'Not assigned',
-      date: order.createdAt.toISOString().split('T')[0],
+      date: formatPktDate(order.createdAt),
       paid: order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUND',
       paidAmount: parseFloat(order.paidAmount),
       paymentStatus: order.paymentStatus.toLowerCase(),

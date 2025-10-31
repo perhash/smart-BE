@@ -1,41 +1,45 @@
 import { PrismaClient } from '@prisma/client';
+import { getTodayPktUtcRange, getPktDayStartUtc, getPktDayEndUtc, formatPktDate, getPktDateRangeUtc } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
-// Helper function to calculate date ranges
+// Helper function to calculate date ranges (using PKT timezone)
 const getDateRange = (period) => {
-  const now = new Date();
-  const startDate = new Date();
+  const todayRange = getTodayPktUtcRange();
+  const PKT_OFFSET_HOURS = 5;
+  const pktNow = new Date(Date.now() + (PKT_OFFSET_HOURS * 60 * 60 * 1000));
   
   switch (period) {
     case 'daily':
-      startDate.setHours(0, 0, 0, 0);
-      return { startDate, endDate: new Date(now.getTime() + 86400000) };
+      return { startDate: todayRange.start, endDate: todayRange.end };
     
     case 'weekly':
-      const dayOfWeek = now.getDay();
-      startDate.setDate(now.getDate() - dayOfWeek);
-      startDate.setHours(0, 0, 0, 0);
-      return { startDate, endDate: new Date(now.getTime() + 86400000) };
+      // Calculate week start in PKT
+      const dayOfWeek = pktNow.getUTCDay(); // 0 = Sunday
+      const weekStartDate = new Date(pktNow);
+      weekStartDate.setUTCDate(pktNow.getUTCDate() - dayOfWeek);
+      const weekStartStr = `${weekStartDate.getUTCFullYear()}-${String(weekStartDate.getUTCMonth() + 1).padStart(2, '0')}-${String(weekStartDate.getUTCDate()).padStart(2, '0')}`;
+      const weekRange = getPktDateRangeUtc(weekStartStr);
+      return { startDate: weekRange.start, endDate: todayRange.end };
     
     case 'monthly':
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      return { startDate, endDate };
+      // First day of current month in PKT
+      const monthStartStr = `${pktNow.getUTCFullYear()}-${String(pktNow.getUTCMonth() + 1).padStart(2, '0')}-01`;
+      const monthStartRange = getPktDayStartUtc(monthStartStr);
+      return { startDate: monthStartRange, endDate: todayRange.end };
     
     case 'yearly':
-      startDate.setMonth(0, 1);
-      startDate.setHours(0, 0, 0, 0);
-      const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-      return { startDate, endDate: yearEnd };
+      // First day of current year in PKT
+      const yearStartStr = `${pktNow.getUTCFullYear()}-01-01`;
+      const yearStartRange = getPktDayStartUtc(yearStartStr);
+      return { startDate: yearStartRange, endDate: todayRange.end };
     
     case 'alltime':
     default:
-      // For all time, go back 5 years
-      startDate.setFullYear(now.getFullYear() - 5);
-      startDate.setHours(0, 0, 0, 0);
-      return { startDate, endDate: new Date(now.getTime() + 86400000) };
+      // For all time, go back 5 years in PKT
+      const fiveYearsAgoStr = `${pktNow.getUTCFullYear() - 5}-01-01`;
+      const fiveYearsAgoRange = getPktDayStartUtc(fiveYearsAgoStr);
+      return { startDate: fiveYearsAgoRange, endDate: todayRange.end };
   }
 };
 
@@ -86,10 +90,10 @@ export const getAnalytics = async (req, res) => {
       // Total revenue
       const totalRevenue = parseFloat(deliveryRevenue) + parseFloat(walkInRevenue);
 
-      // Group by date for chart data
+      // Group by date for chart data (using PKT dates)
       const ordersByDate = {};
       orders.forEach(order => {
-        const date = new Date(order.createdAt).toISOString().split('T')[0];
+        const date = formatPktDate(order.createdAt);
         if (!ordersByDate[date]) {
           ordersByDate[date] = { 
             date, 
@@ -158,11 +162,11 @@ export const getAnalytics = async (req, res) => {
         ? customers.filter(c => c.createdAt >= startDate && c.createdAt <= endDate)
         : customers;
 
-      // Group by date based on order creation dates, not customer creation dates
+      // Group by date based on order creation dates, not customer creation dates (using PKT dates)
       const customersByDate = {};
       filteredCustomers.forEach(customer => {
         customer.orders.forEach(order => {
-          const date = new Date(order.createdAt).toISOString().split('T')[0];
+          const date = formatPktDate(order.createdAt);
           if (!customersByDate[date]) {
             customersByDate[date] = { date, customers: new Set(), active: 0, inactive: 0, orders: 0 };
           }
@@ -214,11 +218,11 @@ export const getAnalytics = async (req, res) => {
         ? riders.filter(r => r.createdAt >= startDate && r.createdAt <= endDate)
         : riders;
 
-      // Group by date based on order creation dates
+      // Group by date based on order creation dates (using PKT dates)
       const ridersByDate = {};
       filteredRiders.forEach(rider => {
         rider.orders.forEach(order => {
-          const date = new Date(order.createdAt).toISOString().split('T')[0];
+          const date = formatPktDate(order.createdAt);
           if (!ridersByDate[date]) {
             ridersByDate[date] = { date, riders: new Set(), active: 0, inactive: 0, deliveries: 0, revenue: 0 };
           }
@@ -274,8 +278,9 @@ export const getReportData = async (req, res) => {
     
     let startDate, endDate;
     if (customStart && customEnd) {
-      startDate = new Date(customStart);
-      endDate = new Date(customEnd);
+      // Convert custom dates from PKT to UTC ranges
+      startDate = getPktDayStartUtc(customStart);
+      endDate = getPktDayEndUtc(customEnd);
     } else {
       const range = getDateRange(period);
       startDate = range.startDate;

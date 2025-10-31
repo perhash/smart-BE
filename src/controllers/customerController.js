@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { handleDatabaseError } from '../middleware/errorHandler.js';
+import { formatPktDate } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
@@ -69,9 +70,9 @@ export const getAllCustomers = async (req, res) => {
         id: `#${customer.orders[0].id.slice(-4)}`,
         amount: parseFloat(customer.orders[0].totalAmount),
         status: customer.orders[0].status.toLowerCase(),
-        date: customer.orders[0].createdAt.toISOString().split('T')[0]
+        date: formatPktDate(customer.orders[0].createdAt)
       } : null,
-      createdAt: customer.createdAt.toISOString().split('T')[0]
+      createdAt: formatPktDate(customer.createdAt)
     }));
 
     res.json({
@@ -124,8 +125,8 @@ export const getCustomerById = async (req, res) => {
       address: `${customer.houseNo || ''} ${customer.streetNo || ''} ${customer.area || ''} ${customer.city || ''}`.trim(),
       currentBalance: parseFloat(customer.currentBalance),
       isActive: customer.isActive,
-      createdAt: customer.createdAt.toISOString().split('T')[0],
-      updatedAt: customer.updatedAt.toISOString().split('T')[0],
+      createdAt: formatPktDate(customer.createdAt),
+      updatedAt: formatPktDate(customer.updatedAt),
       orders: customer.orders.map(order => ({
         id: order.id,
         orderId: `#${order.id.slice(-4)}`,
@@ -140,8 +141,8 @@ export const getCustomerById = async (req, res) => {
           phone: order.rider.phone
         } : null,
         notes: order.notes,
-        createdAt: order.createdAt.toISOString().split('T')[0],
-        deliveredAt: order.deliveredAt?.toISOString().split('T')[0] || null
+        createdAt: formatPktDate(order.createdAt),
+        deliveredAt: order.deliveredAt ? formatPktDate(order.deliveredAt) : null
       })),
       stats: {
         totalOrders: customer.orders.length,
