@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { getTodayPktUtcRange } from '../utils/timezone.js';
+import { getTodayPktUtcRange, formatPktDate } from '../utils/timezone.js';
 
 const prisma = new PrismaClient();
 
@@ -83,8 +83,9 @@ export const getRecentActivities = async (req, res) => {
 
     const activities = recentOrders.map(order => ({
       id: order.id,
-      text: `Order ${order.id} from ${order.customer.name}`,
-      time: order.createdAt,
+      text: `Order #${order.id.slice(-4)} from ${order.customer.name}`,
+      time: order.createdAt, // Frontend will format this
+      date: formatPktDate(order.createdAt), // Add PKT date for reference
       status: order.status.toLowerCase(),
       type: 'order'
     }));
