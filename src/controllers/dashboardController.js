@@ -108,6 +108,7 @@ export const getRecentActivities = async (req, res) => {
         orderType: orderType, // Keep as enum: WALKIN, DELIVERY, CLEARBILL
         totalAmount: totalAmount,
         paidAmount: paidAmount,
+        paymentStatus: order.paymentStatus, // PAID, NOT_PAID, PARTIAL, OVERPAID, REFUND
         deliveredAt: order.deliveredAt || null // Will be formatted in PKT on frontend
       };
     });
