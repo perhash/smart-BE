@@ -9,10 +9,13 @@ export const getDailyClosingSummary = async (req, res) => {
     const todayPktDate = getTodayPktDate();
     const { start, end } = getPktDateRangeUtc(todayPktDate);
 
-    // Check if orders are in progress
+    // Check if orders are in progress (PENDING, ASSIGNED, IN_PROGRESS, CREATED)
+    // These statuses indicate orders that are not completed and should block daily closing
     const inProgressOrders = await prisma.order.count({
       where: {
-        status: 'IN_PROGRESS'
+        status: {
+          in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'CREATED']
+        }
       }
     });
 
@@ -182,17 +185,21 @@ export const saveDailyClosing = async (req, res) => {
     const todayPktDate = getTodayPktDate();
     const { start, end } = getPktDateRangeUtc(todayPktDate);
 
-    // Check if orders are in progress
+    // Check if orders are in progress (PENDING, ASSIGNED, IN_PROGRESS, CREATED)
+    // These statuses indicate orders that are not completed and should block daily closing
     const inProgressOrders = await prisma.order.count({
       where: {
-        status: 'IN_PROGRESS'
+        status: {
+          in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'CREATED']
+        }
       }
     });
 
     if (inProgressOrders > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot close counter when there are orders in progress'
+        message: `Cannot close counter when there are ${inProgressOrders} order(s) in progress. Please complete all pending orders first.`,
+        inProgressOrdersCount: inProgressOrders
       });
     }
 
