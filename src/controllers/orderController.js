@@ -276,6 +276,27 @@ export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status, riderId } = req.body;
 
+    // Get current order to check for existing rider
+    const currentOrder = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        rider: {
+          select: { userId: true, id: true }
+        },
+        customer: true
+      }
+    });
+
+    if (!currentOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    const oldRiderId = currentOrder.riderId;
+    const oldRiderUserId = currentOrder.rider?.userId;
+
     const updateData = { status: status.toUpperCase() };
     if (riderId) {
       updateData.riderId = riderId;
@@ -286,9 +307,93 @@ export const updateOrderStatus = async (req, res) => {
       data: updateData,
       include: {
         customer: true,
-        rider: true
+        rider: {
+          include: {
+            user: {
+              select: { id: true }
+            }
+          }
+        }
       }
     });
+
+    // If rider is being changed (reassigned), send notifications
+    if (riderId && oldRiderId && riderId !== oldRiderId) {
+      try {
+        // Notify old rider that order is unassigned
+        if (oldRiderUserId) {
+          await prisma.notification.create({
+            data: {
+              userId: oldRiderUserId,
+              title: 'Order Unassigned',
+              message: `Order #${id.slice(-4)} has been unassigned from you`,
+              type: 'ORDER_UNASSIGNED',
+              data: {
+                orderId: id,
+                customer: {
+                  id: currentOrder.customerId,
+                  name: currentOrder.customer.name,
+                  phone: currentOrder.customer.phone
+                }
+              }
+            }
+          });
+        }
+
+        // Notify new rider that order is assigned
+        if (order.rider?.user?.id) {
+          await prisma.notification.create({
+            data: {
+              userId: order.rider.user.id,
+              title: 'Order Assigned',
+              message: `Order #${id.slice(-4)} has been assigned to you`,
+              type: 'ORDER_ASSIGNED',
+              data: {
+                orderId: id,
+                priority: order.priority,
+                totalAmount: order.totalAmount,
+                numberOfBottles: order.numberOfBottles,
+                customer: {
+                  id: order.customerId,
+                  name: order.customer.name,
+                  phone: order.customer.phone
+                }
+              }
+            }
+          });
+        }
+      } catch (notifyErr) {
+        console.error('Failed to create rider notifications:', notifyErr);
+        // Continue even if notifications fail
+      }
+    } else if (riderId && !oldRiderId) {
+      // First time assignment - notify new rider
+      try {
+        if (order.rider?.user?.id) {
+          await prisma.notification.create({
+            data: {
+              userId: order.rider.user.id,
+              title: 'New Order Assigned',
+              message: `Order #${id.slice(-4)} has been assigned to you`,
+              type: 'ORDER_ASSIGNED',
+              data: {
+                orderId: id,
+                priority: order.priority,
+                totalAmount: order.totalAmount,
+                numberOfBottles: order.numberOfBottles,
+                customer: {
+                  id: order.customerId,
+                  name: order.customer.name,
+                  phone: order.customer.phone
+                }
+              }
+            }
+          });
+        }
+      } catch (notifyErr) {
+        console.error('Failed to create rider notification:', notifyErr);
+      }
+    }
 
     res.json({
       success: true,
