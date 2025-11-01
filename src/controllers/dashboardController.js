@@ -78,11 +78,10 @@ export const getRecentActivities = async (req, res) => {
           lte: todayRange.end
         }
       },
-      take: 10,
       orderBy: { createdAt: 'desc' },
       include: {
         customer: {
-          select: { name: true }
+          select: { name: true, houseNo: true }
         },
         rider: {
           select: { name: true }
@@ -100,15 +99,18 @@ export const getRecentActivities = async (req, res) => {
       
       return {
         id: order.id,
-        text: `Order #${order.id.slice(-4)} from ${order.customer.name}`,
+        orderId: order.id.slice(-4), // Last 4 characters for display
+        customerName: order.customer.name,
+        houseNo: order.customer.houseNo || null,
         time: order.createdAt, // Frontend will format this
         date: formatPktDate(order.createdAt), // Add PKT date for reference
-        status: order.status.toLowerCase(),
+        status: order.status, // Keep as uppercase: PENDING, ASSIGNED, IN_PROGRESS, DELIVERED, COMPLETED, etc.
         type: 'order',
         orderType: orderType, // Keep as enum: WALKIN, DELIVERY, CLEARBILL
         totalAmount: totalAmount,
         paidAmount: paidAmount,
         paymentStatus: order.paymentStatus, // PAID, NOT_PAID, PARTIAL, OVERPAID, REFUND
+        riderName: order.rider?.name || null,
         deliveredAt: order.deliveredAt || null // Will be formatted in PKT on frontend
       };
     });
