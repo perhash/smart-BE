@@ -160,27 +160,27 @@ model DailyClosingPayment {
 }
 
 model CompanySetup {
-  id                String           @id @default(cuid())
-  agencyName        String
-  agencyAddress     String
-  agencyPhoneNumber String
-  agencyLogo        String
-  areasOperated     Json             // Array of strings
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  bottleCategories  BottleCategory[]
+  id                 String          @id @default(cuid())
+  agencyName         String
+  agencyAddress      String
+  agencyPhoneNumber  String
+  agencyLogo         String?         // base64 encoded image
+  areasOperated      Json            @default("[]") // Array of strings
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  bottleCategories   BottleCategory[]
 
   @@map("company_setups")
 }
 
 model BottleCategory {
-  id              String        @id @default(cuid())
-  categoryName    String
-  price           Decimal
-  companySetupId  String
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  companySetup    CompanySetup  @relation(fields: [companySetupId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  categoryName   String
+  price          Decimal
+  companySetupId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  companySetup   CompanySetup @relation(fields: [companySetupId], references: [id], onDelete: Cascade)
 
   @@map("bottle_categories")
 }
