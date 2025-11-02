@@ -9,23 +9,23 @@ datasource db {
 }
 
 model User {
-  id                 String              @id
-  email              String              @unique
-  phone              String?             @unique
-  password           String
-  role               UserRole            @default(ADMIN)
-  isActive           Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  adminProfile       AdminProfile?
-  pushSubscriptions  PushSubscription[]
-  riderProfile       RiderProfile?
+  id                String             @id @default(cuid())
+  email             String             @unique
+  phone             String?            @unique
+  password          String
+  role              UserRole           @default(ADMIN)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  adminProfile      AdminProfile?
+  pushSubscriptions PushSubscription[]
+  riderProfile      RiderProfile?
 
   @@map("users")
 }
 
 model AdminProfile {
-  id        String   @id
+  id        String   @id @default(cuid())
   userId    String   @unique
   name      String
   company   String?
@@ -37,22 +37,22 @@ model AdminProfile {
 }
 
 model RiderProfile {
-  id                String               @id
-  userId            String               @unique
-  name              String
-  phone             String
-  isActive          Boolean              @default(true)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  dailyCollections  DailyClosingRider[]
-  orders            Order[]
-  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String              @id @default(cuid())
+  userId           String              @unique
+  name             String
+  phone            String
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  dailyCollections DailyClosingRider[]
+  orders           Order[]
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("rider_profiles")
 }
 
 model Customer {
-  id              String   @id
+  id              String   @id @default(cuid())
   name            String
   phone           String   @unique
   houseNo         String?
@@ -72,7 +72,7 @@ model Customer {
 }
 
 model Order {
-  id                 String        @id
+  id                 String        @id @default(cuid())
   customerId         String
   riderId            String?
   status             OrderStatus   @default(PENDING)
@@ -99,7 +99,7 @@ model Order {
 }
 
 model Notification {
-  id        String           @id
+  id        String           @id @default(cuid())
   userId    String?
   title     String
   message   String
@@ -112,7 +112,7 @@ model Notification {
 }
 
 model DailyClosing {
-  id                      String                @id
+  id                      String                @id @default(cuid())
   date                    DateTime              @unique
   customerPayable         Decimal               @default(0)
   customerReceivable      Decimal               @default(0)
@@ -132,50 +132,50 @@ model DailyClosing {
 }
 
 model DailyClosingRider {
-  id              String       @id
-  dailyClosingId  String
-  riderId         String
-  amount          Decimal      @default(0)
-  ordersCount     Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  dailyClosing    DailyClosing @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
-  rider           RiderProfile @relation(fields: [riderId], references: [id])
+  id             String       @id @default(cuid())
+  dailyClosingId String
+  riderId        String
+  amount         Decimal      @default(0)
+  ordersCount    Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  dailyClosing   DailyClosing @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
+  rider          RiderProfile @relation(fields: [riderId], references: [id])
 
   @@unique([dailyClosingId, riderId])
   @@map("daily_closing_riders")
 }
 
 model DailyClosingPayment {
-  id              String       @id
-  dailyClosingId  String
-  paymentMethod   PaymentMethod
-  amount          Decimal      @default(0)
-  ordersCount     Int          @default(0)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  dailyClosing    DailyClosing @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
+  id             String        @id @default(cuid())
+  dailyClosingId String
+  paymentMethod  PaymentMethod
+  amount         Decimal       @default(0)
+  ordersCount    Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  dailyClosing   DailyClosing  @relation(fields: [dailyClosingId], references: [id], onDelete: Cascade)
 
   @@unique([dailyClosingId, paymentMethod])
   @@map("daily_closing_payments")
 }
 
 model CompanySetup {
-  id                String          @id
+  id                String           @id @default(cuid())
   agencyName        String
   agencyAddress     String
   agencyPhoneNumber String
-  agencyLogo        String          @default("")
-  areasOperated     Json            @default("[]")
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  agencyLogo        String           @default("")
+  areasOperated     Json             @default("[]")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   bottleCategories  BottleCategory[]
 
   @@map("company_setups")
 }
 
 model BottleCategory {
-  id             String       @id
+  id             String       @id @default(cuid())
   categoryName   String
   price          Decimal
   companySetupId String
@@ -187,7 +187,7 @@ model BottleCategory {
 }
 
 model PushSubscription {
-  id         String   @id
+  id         String   @id @default(cuid())
   userId     String
   token      String   @unique
   userAgent  String?
