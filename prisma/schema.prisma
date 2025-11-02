@@ -9,22 +9,23 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  phone        String?       @unique
-  password     String
-  role         UserRole      @default(ADMIN)
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  adminProfile AdminProfile?
-  riderProfile RiderProfile?
+  id                 String              @id
+  email              String              @unique
+  phone              String?             @unique
+  password           String
+  role               UserRole            @default(ADMIN)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  adminProfile       AdminProfile?
+  pushSubscriptions  PushSubscription[]
+  riderProfile       RiderProfile?
 
   @@map("users")
 }
 
 model AdminProfile {
-  id        String   @id @default(cuid())
+  id        String   @id
   userId    String   @unique
   name      String
   company   String?
@@ -36,22 +37,22 @@ model AdminProfile {
 }
 
 model RiderProfile {
-  id                String               @id @default(cuid())
+  id                String               @id
   userId            String               @unique
   name              String
   phone             String
   isActive          Boolean              @default(true)
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
+  dailyCollections  DailyClosingRider[]
   orders            Order[]
   user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dailyCollections  DailyClosingRider[]
 
   @@map("rider_profiles")
 }
 
 model Customer {
-  id              String   @id @default(cuid())
+  id              String   @id
   name            String
   phone           String   @unique
   houseNo         String?
@@ -71,7 +72,7 @@ model Customer {
 }
 
 model Order {
-  id                 String        @id @default(cuid())
+  id                 String        @id
   customerId         String
   riderId            String?
   status             OrderStatus   @default(PENDING)
@@ -98,7 +99,7 @@ model Order {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
+  id        String           @id
   userId    String?
   title     String
   message   String
@@ -111,27 +112,27 @@ model Notification {
 }
 
 model DailyClosing {
-  id                       String                     @id @default(cuid())
-  date                     DateTime                   @unique
-  customerPayable          Decimal                    @default(0)
-  customerReceivable       Decimal                    @default(0)
-  totalPaidAmount          Decimal                    @default(0)
-  totalCurrentOrderAmount  Decimal                    @default(0)
-  walkInAmount             Decimal                    @default(0)
-  clearBillAmount          Decimal                    @default(0)
-  balanceClearedToday      Decimal                    @default(0)
-  totalBottles             Int                        @default(0)
-  totalOrders              Int                        @default(0)
-  createdAt                DateTime                   @default(now())
-  updatedAt                DateTime                   @updatedAt
-  riderCollections         DailyClosingRider[]
-  paymentMethods           DailyClosingPayment[]
+  id                      String                @id
+  date                    DateTime              @unique
+  customerPayable         Decimal               @default(0)
+  customerReceivable      Decimal               @default(0)
+  totalPaidAmount         Decimal               @default(0)
+  totalCurrentOrderAmount Decimal               @default(0)
+  balanceClearedToday     Decimal               @default(0)
+  totalBottles            Int                   @default(0)
+  totalOrders             Int                   @default(0)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  walkInAmount            Decimal               @default(0)
+  clearBillAmount         Decimal               @default(0)
+  dailyClosingPayments    DailyClosingPayment[]
+  dailyClosingRiders      DailyClosingRider[]
 
   @@map("daily_closings")
 }
 
 model DailyClosingRider {
-  id              String       @id @default(cuid())
+  id              String       @id
   dailyClosingId  String
   riderId         String
   amount          Decimal      @default(0)
@@ -146,7 +147,7 @@ model DailyClosingRider {
 }
 
 model DailyClosingPayment {
-  id              String       @id @default(cuid())
+  id              String       @id
   dailyClosingId  String
   paymentMethod   PaymentMethod
   amount          Decimal      @default(0)
@@ -160,21 +161,21 @@ model DailyClosingPayment {
 }
 
 model CompanySetup {
-  id                 String          @id @default(cuid())
-  agencyName         String
-  agencyAddress      String
-  agencyPhoneNumber  String
-  agencyLogo         String?         // base64 encoded image
-  areasOperated      Json            @default("[]") // Array of strings
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
-  bottleCategories   BottleCategory[]
+  id                String          @id
+  agencyName        String
+  agencyAddress     String
+  agencyPhoneNumber String
+  agencyLogo        String          @default("")
+  areasOperated     Json            @default("[]")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  bottleCategories  BottleCategory[]
 
   @@map("company_setups")
 }
 
 model BottleCategory {
-  id             String       @id @default(cuid())
+  id             String       @id
   categoryName   String
   price          Decimal
   companySetupId String
@@ -185,10 +186,27 @@ model BottleCategory {
   @@map("bottle_categories")
 }
 
-enum UserRole {
-  ADMIN
-  RIDER
-  CUSTOMER
+model PushSubscription {
+  id         String   @id
+  userId     String
+  token      String   @unique
+  userAgent  String?
+  deviceType String?
+  platform   String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_subscriptions")
+}
+
+enum NotificationType {
+  ORDER_ASSIGNED
+  ORDER_DELIVERED
+  PAYMENT_RECEIVED
+  PAYMENT_OVERDUE
+  SYSTEM_UPDATE
 }
 
 enum OrderStatus {
@@ -208,21 +226,6 @@ enum OrderType {
   CLEARBILL
 }
 
-enum Priority {
-  LOW
-  NORMAL
-  HIGH
-  URGENT
-}
-
-enum PaymentStatus {
-  PAID
-  NOT_PAID
-  OVERPAID
-  PARTIAL
-  REFUND
-}
-
 enum PaymentMethod {
   CASH
   CARD
@@ -233,10 +236,23 @@ enum PaymentMethod {
   SADAPAY
 }
 
-enum NotificationType {
-  ORDER_ASSIGNED
-  ORDER_DELIVERED
-  PAYMENT_RECEIVED
-  PAYMENT_OVERDUE
-  SYSTEM_UPDATE
+enum PaymentStatus {
+  PAID
+  NOT_PAID
+  OVERPAID
+  PARTIAL
+  REFUND
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum UserRole {
+  ADMIN
+  RIDER
+  CUSTOMER
 }
