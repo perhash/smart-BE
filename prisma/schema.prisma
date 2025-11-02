@@ -159,6 +159,32 @@ model DailyClosingPayment {
   @@map("daily_closing_payments")
 }
 
+model CompanySetup {
+  id                String           @id @default(cuid())
+  agencyName        String
+  agencyAddress     String
+  agencyPhoneNumber String
+  agencyLogo        String
+  areasOperated     Json             // Array of strings
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  bottleCategories  BottleCategory[]
+
+  @@map("company_setups")
+}
+
+model BottleCategory {
+  id              String        @id @default(cuid())
+  categoryName    String
+  price           Decimal
+  companySetupId  String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  companySetup    CompanySetup  @relation(fields: [companySetupId], references: [id], onDelete: Cascade)
+
+  @@map("bottle_categories")
+}
+
 enum UserRole {
   ADMIN
   RIDER
